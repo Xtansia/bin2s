@@ -92,7 +92,7 @@ result bin2s(const std::string &identifier, std::istream &input,
   if (size == 0) return result::empty_stream;
 
   input.get();
-  if (!input.good()) return result::read_error;
+  if (!input) return result::read_error;
   input.seekg(-1, std::ios::cur);
 
   output << "  .section .rodata" << std::endl
@@ -110,6 +110,8 @@ result bin2s(const std::string &identifier, std::istream &input,
     input.read(reinterpret_cast<char *>(&readBytes[0]),
                std::min(static_cast<std::streamsize>(lineLength), remaining));
     nRead = input.gcount();
+
+    if (!input) return result::read_error;
 
     output << "  .byte ";
 
@@ -138,7 +140,7 @@ int bin2s_files(const std::vector<std::string> &files, std::ostream &output,
   for (const auto &file : files) {
     std::ifstream input(file, std::ios::binary);
 
-    if (!input.is_open()) {
+    if (!input) {
       std::cerr << "bin2s: error: could not open  \"" << file << '"'
                 << std::endl;
       return 1;
@@ -237,7 +239,7 @@ e.g. for gfx/foo.bin {identifier} will be foo_bin,
     return bin2s_files(inputFiles, std::cout, alignment, lineLength);
   } else {
     std::ofstream output(outputFile);
-    if (!output.is_open()) {
+    if (!output) {
       std::cerr << "bin2s: error: could not open output file \"" << outputFile
                 << '"' << std::endl;
       return 1;

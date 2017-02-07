@@ -56,7 +56,13 @@ std::string basename(const std::string &path) {
   static constexpr auto path_seps = "/";
 #endif
   auto pos = path.find_last_of(path_seps);
-  return pos == std::string::npos ? path : path.substr(pos + 1);
+  if (pos == path.length() - 1) {
+    return basename(path.substr(0, path.length() - 1));
+  } else if (pos == std::string::npos) {
+    return path;
+  } else {
+    return path.substr(pos + 1);
+  }
 }
 
 std::string make_c_identifier(const std::string &str) {

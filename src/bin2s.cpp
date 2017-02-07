@@ -14,7 +14,7 @@
 #include <regex>
 #include <string>
 
-struct PositiveIntReader : public args::ValueReader<int32_t> {
+struct PositiveIntReader {
   bool operator()(const std::string &name, const std::string &value,
                   int32_t &destination) {
     std::istringstream ss(value);
@@ -31,7 +31,7 @@ struct PositiveIntReader : public args::ValueReader<int32_t> {
   }
 };
 
-struct PO2IntReader : public args::ValueReader<int32_t> {
+struct PO2IntReader {
   bool operator()(const std::string &name, const std::string &value,
                   int32_t &destination) {
     std::istringstream ss(value);

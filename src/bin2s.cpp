@@ -138,7 +138,33 @@ int bin2s_files(const std::vector<std::string> &files, std::ostream &output,
 }
 
 int main(int argc, char *argv[]) {
-  args::ArgumentParser parser("Convert binary files to GCC assembly modules");
+  args::ArgumentParser parser("Convert binary files to GCC assembly modules.");
+  static constexpr auto extended_description = R"__(
+For each input file it will output assembly defining:
+
+  * {identifier}:
+      An array of bytes containing the data.
+  * {identifier}_end:
+      Will be at the location directly after the end of the data.
+  * {identifier}_size:
+      An unsigned int containing the length of the data in bytes.
+
+Roughly equivalent to this pseudocode:
+
+  unsigned int identifier_size = ...
+  unsigned char identifier[identifier_size] = { ... }
+  unsigned char identifier_end[] = identifier + identifier_size
+
+Where {identifier} is the input file's name,
+sanitized to produce a legal C identifier, by doing the following:
+
+  * Stripping all character that are not ASCII letters, digits or one of _-./
+  * Replacing all of -./ with _
+  * Prepending _ if the remaining identifier begins with a digit.
+
+e.g. for gfx/foo.bin {identifier} will be foo_bin,
+     and for 4bit.chr it will be _4bit_chr.
+)__";
   parser.SetArgumentSeparations(false, true, true, true);
   args::HelpFlag helpFlag(parser, "HELP", "Show this help message and exit",
                           {'h', "help"});
@@ -159,10 +185,12 @@ int main(int argc, char *argv[]) {
     parser.ParseCLI(argc, argv);
   } catch (args::Help) {
     std::cout << parser;
+    std::cout << extended_description;
     return 0;
   } catch (args::ParseError e) {
     std::cerr << e.what() << std::endl;
     std::cerr << parser;
+    std::cerr << extended_description;
     return 1;
   }
 

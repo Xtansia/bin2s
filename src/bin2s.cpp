@@ -69,17 +69,19 @@ std::string make_c_identifier(const std::string &str) {
   return std::regex_replace(res, leadingDigit, "_$1");
 }
 
-bool bin2s(const std::string &identifier, std::istream &input,
-           std::ostream &output, int32_t alignment = 4,
-           int32_t lineLength = 16) {
+int bin2s(const std::string &identifier, std::istream &input,
+          std::ostream &output, int32_t alignment = 4,
+          int32_t lineLength = 16) {
   auto c_identifier = make_c_identifier(identifier);
+
+  if (c_identifier.empty()) return 1;
 
   auto cur_pos = input.tellg();
   input.seekg(0, std::ios::end);
   auto size = input.tellg() - cur_pos;
   input.seekg(cur_pos);
 
-  if (size == 0) return false;
+  if (size == 0) return 2;
 
   output << "  .section .rodata" << std::endl
          << "  .balign " << alignment << std::endl
@@ -112,7 +114,7 @@ bool bin2s(const std::string &identifier, std::istream &input,
          << "  .align" << std::endl
          << c_identifier << "_size: .int " << size << std::endl;
 
-  return true;
+  return 0;
 }
 
 int bin2s_files(const std::vector<std::string> &files, std::ostream &output,
@@ -128,10 +130,22 @@ int bin2s_files(const std::vector<std::string> &files, std::ostream &output,
       return 1;
     }
 
-    if (!bin2s(basename(file), input, output, alignment, lineLength))
+    auto ret = bin2s(basename(file), input, output, alignment, lineLength);
+    input.close();
+
+    switch (ret) {
+    case 0:
+      break;
+    case 1:
+      std::cerr
+          << "bin2s: error: filename does not contain any valid characters \""
+          << file << '"' << std::endl;
+      return 1;
+    case 2:
       std::cerr << "bin2s: warning: skipping empty file \"" << file << '"'
                 << std::endl;
-    input.close();
+      break;
+    }
   }
 
   return 0;

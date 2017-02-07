@@ -202,7 +202,7 @@ e.g. for gfx/foo.bin {identifier} will be foo_bin,
   if (inputFiles.empty()) return 0;
 
   if (outputFile == "-") {
-    bin2s_files(inputFiles, std::cout, alignment, lineLength);
+    return bin2s_files(inputFiles, std::cout, alignment, lineLength);
   } else {
     std::ofstream output(outputFile);
     if (!output.is_open()) {
@@ -210,9 +210,8 @@ e.g. for gfx/foo.bin {identifier} will be foo_bin,
                 << '"' << std::endl;
       return 1;
     }
-    bin2s_files(inputFiles, output, alignment, lineLength);
+    auto ret = bin2s_files(inputFiles, output, alignment, lineLength);
     output.close();
+    return ret;
   }
-
-  return 0;
 }

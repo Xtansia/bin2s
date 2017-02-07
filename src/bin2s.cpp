@@ -75,19 +75,25 @@ std::string make_c_identifier(const std::string &str) {
   return std::regex_replace(res, leadingDigit, "_$1");
 }
 
-int bin2s(const std::string &identifier, std::istream &input,
-          std::ostream &output, int32_t alignment = 4,
-          int32_t lineLength = 16) {
+enum class result { success, identifier_invalid, read_error, empty_stream };
+
+result bin2s(const std::string &identifier, std::istream &input,
+             std::ostream &output, int32_t alignment = 4,
+             int32_t lineLength = 16) {
   auto c_identifier = make_c_identifier(identifier);
 
-  if (c_identifier.empty()) return 1;
+  if (c_identifier.empty()) return result::identifier_invalid;
 
   auto cur_pos = input.tellg();
   input.seekg(0, std::ios::end);
   auto size = input.tellg() - cur_pos;
   input.seekg(cur_pos);
 
-  if (size == 0) return 2;
+  if (size == 0) return result::empty_stream;
+
+  input.get();
+  if (!input.good()) return result::read_error;
+  input.seekg(-1, std::ios::cur);
 
   output << "  .section .rodata" << std::endl
          << "  .balign " << alignment << std::endl
@@ -101,7 +107,8 @@ int bin2s(const std::string &identifier, std::istream &input,
   std::vector<uint8_t> readBytes(lineLength);
 
   for (auto remaining = size; remaining > 0; remaining -= nRead) {
-    input.read(reinterpret_cast<char *>(&readBytes[0]), lineLength);
+    input.read(reinterpret_cast<char *>(&readBytes[0]),
+               std::min(static_cast<std::streamsize>(lineLength), remaining));
     nRead = input.gcount();
 
     output << "  .byte ";
@@ -120,7 +127,7 @@ int bin2s(const std::string &identifier, std::istream &input,
          << "  .align" << std::endl
          << c_identifier << "_size: .int " << size << std::endl;
 
-  return 0;
+  return result::success;
 }
 
 int bin2s_files(const std::vector<std::string> &files, std::ostream &output,
@@ -141,14 +148,18 @@ int bin2s_files(const std::vector<std::string> &files, std::ostream &output,
     input.close();
 
     switch (ret) {
-    case 0:
+    case result::success:
       break;
-    case 1:
+    case result::identifier_invalid:
       std::cerr
           << "bin2s: error: filename does not contain any valid characters \""
           << file << '"' << std::endl;
       return 1;
-    case 2:
+    case result::read_error:
+      std::cerr << "bin2s: error: unable to read file \"" << file << '"'
+                << std::endl;
+      return 1;
+    case result::empty_stream:
       std::cerr << "bin2s: warning: skipping empty file \"" << file << '"'
                 << std::endl;
       break;

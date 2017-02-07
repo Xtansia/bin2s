@@ -1,0 +1,3 @@
+[submodule "deps/args"]
+	path = deps/args
+	url = https://github.com/taywee/args

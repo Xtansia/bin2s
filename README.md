@@ -53,10 +53,13 @@ e.g. for gfx/foo.bin {identifier} will be foo_bin,
 ## Example
 
 Given input file `hello_world.txt`:
+
 ```
 Hello World
 ```
+
 It will produce the following assembly:
+
 ```
   .section .rodata
   .balign 4
@@ -71,4 +74,74 @@ hello_world_txt_end:
 
   .align
 hello_world_txt_size: .int 11
+```
+
+You can then use it from your program by for example creating a header like so:
+
+```c
+extern unsigned char hello_world_txt[];
+extern unsigned char hello_world_txt_end[];
+extern unsigned int hello_world_txt_size;
+```
+
+## CMake
+
+Here's an example CMake snippet to automatically download & build bin2s, 
+and add a function for creating a library target from binary files.
+
+```cmake
+include(ExternalProject)
+
+ExternalProject_Add(bin2s_git
+  PREFIX vendor/
+  GIT_REPOSITORY https://github.com/Xtansia/bin2s
+  GIT_TAG master
+  GIT_SUBMODULES
+  UPDATE_COMMAND ""
+  PATCH_COMMAND ""
+  BUILD_COMMAND ""
+  CMAKE_ARGS 
+    "-DCMAKE_BUILD_TYPE=Release" 
+    "-DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>"
+  INSTALL_COMMAND
+    "${CMAKE_COMMAND}"
+    --build .
+    --target install
+    --config Release)
+
+add_executable(bin2s IMPORTED GLOBAL)
+set_target_properties(bin2s PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/vendor/bin/bin2s)
+add_dependencies(bin2s bin2s_git)
+
+function(add_binfile_library target_name)
+  if (NOT ${ARGC} GREATER 1)
+    message(FATAL_ERROR "add_binfile_library : Argument error (no input files)")
+  endif()
+  
+  get_cmake_property(_enabled_languages ENABLED_LANGUAGES)
+  if (NOT _enabled_languages MATCHES ".*ASM.*")
+    message(FATAL_ERROR "add_binfile_library : ASM language needs to be enabled")
+  endif()
+
+  set(_output_dir ${CMAKE_CURRENT_BINARY_DIR}/binfile_asm)
+  set(_output_file ${_output_dir}/${target_name}.s)
+  
+  file(MAKE_DIRECTORY ${_output_dir})
+
+  add_custom_command(OUTPUT ${_output_file}
+                     COMMAND bin2s -o "${_output_file}" ${ARGN}
+                     DEPENDS ${ARGN}
+                     WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR})
+  
+  add_library(${target_name} ${_output_file})
+endfunction()
+```
+
+Which you could then use like so:
+
+```cmake
+add_binfile_library(resources res/some_picture.png)
+
+add_executable(myprogram src/main.cpp)
+target_link_libraries(myprogram resources)
 ```

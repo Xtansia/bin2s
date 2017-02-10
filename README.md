@@ -35,9 +35,9 @@ For each input file it will output assembly defining:
 
 Roughly equivalent to this pseudocode:
 
-  unsigned int identifier_size = ...
-  unsigned char identifier[identifier_size] = { ... }
-  unsigned char identifier_end[] = identifier + identifier_size
+  const unsigned int identifier_size = ...
+  const unsigned char identifier[identifier_size] = { ... }
+  const unsigned char identifier_end[] = identifier + identifier_size
 
 Where {identifier} is the input file's name,
 sanitized to produce a legal C identifier, by doing the following:
@@ -79,9 +79,9 @@ hello_world_txt_size: .int 11
 You can then use it from your program by for example creating a header like so:
 
 ```c
-extern unsigned char hello_world_txt[];
-extern unsigned char hello_world_txt_end[];
-extern unsigned int hello_world_txt_size;
+extern const unsigned char hello_world_txt[];
+extern const unsigned char hello_world_txt_end[];
+extern const unsigned int hello_world_txt_size;
 ```
 
 ## CMake

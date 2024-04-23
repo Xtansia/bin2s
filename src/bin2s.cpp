@@ -25,7 +25,7 @@ struct PositiveIntReader {
     str_stream >> destination;
 
     if (str_stream.rdbuf()->in_avail() > 0 || destination < 1) {
-      std::ostringstream problem;
+      std::ostringstream problem{};
       problem << "Argument '" << name << "' must be a positive int, received '"
               << value << "'";
       throw args::ParseError(problem.str());
@@ -43,7 +43,7 @@ struct PO2IntReader {
 
     if (str_stream.rdbuf()->in_avail() > 0 || destination < 1 ||
         (destination & (destination - 1)) != 0) {
-      std::ostringstream problem;
+      std::ostringstream problem{};
       problem << "Argument '" << name << "' must be a power of two, received '"
               << value << "'";
       throw args::ParseError(problem.str());

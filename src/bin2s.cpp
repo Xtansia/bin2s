@@ -7,6 +7,7 @@
 */
 
 #include <algorithm>
+#include <cstdint>
 #include <args.hxx>
 #include <fstream>
 #include <iomanip>
@@ -85,7 +86,7 @@ auto make_c_identifier(const std::string &str) -> std::string {
   return std::regex_replace(res, leadingDigit, "_$1");
 }
 
-enum class result : std::uint8_t {
+enum class result : uint8_t {
   success,
   identifier_invalid,
   read_error,

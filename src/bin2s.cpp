@@ -42,7 +42,7 @@ struct PO2IntReader {
     str_stream >> destination;
 
     if (str_stream.rdbuf()->in_avail() > 0 || destination < 1 ||
-        (destination & destination - 1) != 0) {
+        (destination & (destination - 1)) != 0) {
       std::ostringstream problem;
       problem << "Argument '" << name << "' must be a power of two, received '"
               << value << "'";
@@ -67,8 +67,8 @@ auto basename(const std::string &path) -> std::string {
   }
   view = view.substr(0, last_non_path_sep + 1);
 
-  const auto last_path_sep = view.find_last_of(path_seps);
-  if (last_path_sep != std::string_view::npos) {
+  if (const auto last_path_sep = view.find_last_of(path_seps);
+      last_path_sep != std::string_view::npos) {
     view = view.substr(last_path_sep + 1);
   }
 

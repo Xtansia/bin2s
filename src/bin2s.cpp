@@ -14,13 +14,16 @@
 #include <regex>
 #include <string>
 
-struct PositiveIntReader {
-  bool operator()(const std::string &name, const std::string &value,
-                  int32_t &destination) {
-    std::istringstream ss(value);
-    ss >> destination;
+constexpr int32_t DEFAULT_ALIGNMENT = 4;
+constexpr int32_t DEFAULT_BYTES_PER_LINE = 16;
 
-    if (ss.rdbuf()->in_avail() > 0 || destination < 1) {
+struct PositiveIntReader {
+  auto operator()(const std::string &name, const std::string &value,
+                  int32_t &destination) const -> bool {
+    std::istringstream str_stream(value);
+    str_stream >> destination;
+
+    if (str_stream.rdbuf()->in_avail() > 0 || destination < 1) {
       std::ostringstream problem;
       problem << "Argument '" << name << "' must be a positive int, received '"
               << value << "'";
@@ -32,13 +35,13 @@ struct PositiveIntReader {
 };
 
 struct PO2IntReader {
-  bool operator()(const std::string &name, const std::string &value,
-                  int32_t &destination) {
-    std::istringstream ss(value);
-    ss >> destination;
+  auto operator()(const std::string &name, const std::string &value,
+                  int32_t &destination) const -> bool {
+    std::istringstream str_stream(value);
+    str_stream >> destination;
 
-    if (ss.rdbuf()->in_avail() > 0 || destination < 1 ||
-        (destination & (destination - 1)) != 0) {
+    if (str_stream.rdbuf()->in_avail() > 0 || destination < 1 ||
+        (destination & destination - 1) != 0) {
       std::ostringstream problem;
       problem << "Argument '" << name << "' must be a power of two, received '"
               << value << "'";
@@ -49,23 +52,29 @@ struct PO2IntReader {
   }
 };
 
-std::string basename(const std::string &path) {
+auto basename(const std::string &path) -> std::string {
 #if defined(WIN32) || defined(_WIN32)
   static constexpr auto path_seps = "/\\";
 #else
   static constexpr auto path_seps = "/";
 #endif
-  auto pos = path.find_last_of(path_seps);
-  if (pos == path.length() - 1) {
-    return basename(path.substr(0, path.length() - 1));
-  } else if (pos == std::string::npos) {
-    return path;
-  } else {
-    return path.substr(pos + 1);
+
+  std::string_view view(path);
+  const auto last_non_path_sep = view.find_last_not_of(path_seps);
+  if (last_non_path_sep == std::string_view::npos) {
+    return {};
   }
+  view = view.substr(0, last_non_path_sep + 1);
+
+  const auto last_path_sep = view.find_last_of(path_seps);
+  if (last_path_sep != std::string_view::npos) {
+    view = view.substr(last_path_sep + 1);
+  }
+
+  return std::string(view);
 }
 
-std::string make_c_identifier(const std::string &str) {
+auto make_c_identifier(const std::string &str) -> std::string {
   static std::regex invalidChar("[^A-Za-z0-9_./-]");
   static std::regex separatorChar("[./-]");
   static std::regex leadingDigit("^(\\d)");
@@ -75,78 +84,93 @@ std::string make_c_identifier(const std::string &str) {
   return std::regex_replace(res, leadingDigit, "_$1");
 }
 
-enum class result { success, identifier_invalid, read_error, empty_stream };
+enum class result : std::uint8_t {
+  success,
+  identifier_invalid,
+  read_error,
+  empty_stream
+};
 
-result bin2s(const std::string &identifier, std::istream &input,
-             std::ostream &output, int32_t alignment = 4,
-             int32_t lineLength = 16) {
-  auto c_identifier = make_c_identifier(identifier);
+auto bin2s(const std::string &identifier, std::istream &input,
+           std::ostream &output, const int32_t alignment = DEFAULT_ALIGNMENT,
+           const int32_t lineLength = DEFAULT_BYTES_PER_LINE) -> result {
+  const auto c_identifier = make_c_identifier(identifier);
 
-  if (c_identifier.empty()) return result::identifier_invalid;
+  if (c_identifier.empty()) {
+    return result::identifier_invalid;
+  }
 
-  auto cur_pos = input.tellg();
+  const auto cur_pos = input.tellg();
   input.seekg(0, std::ios::end);
-  auto size = input.tellg() - cur_pos;
+  const std::streamsize size = input.tellg() - cur_pos;
   input.seekg(cur_pos);
 
-  if (size == 0) return result::empty_stream;
+  if (size == 0) {
+    return result::empty_stream;
+  }
 
   input.get();
-  if (!input) return result::read_error;
+  if (!input) {
+    return result::read_error;
+  }
   input.seekg(-1, std::ios::cur);
 
-  output << "  .section .rodata" << std::endl
-         << "  .balign " << alignment << std::endl
-         << "  .global " << c_identifier << std::endl
-         << "  .global " << c_identifier << "_end" << std::endl
-         << "  .global " << c_identifier << "_size" << std::endl
-         << std::endl
-         << c_identifier << ":" << std::endl;
+  output << "  .section .rodata\n"
+         << "  .balign " << alignment << '\n'
+         << "  .global " << c_identifier << '\n'
+         << "  .global " << c_identifier << "_end\n"
+         << "  .global " << c_identifier << "_size\n"
+         << '\n'
+         << c_identifier << ":\n";
 
-  std::streamsize nRead = 0;
+  std::streamsize nRead(0);
   std::vector<uint8_t> readBytes(lineLength);
 
   for (auto remaining = size; remaining > 0; remaining -= nRead) {
-    input.read(reinterpret_cast<char *>(&readBytes[0]),
+    input.read(reinterpret_cast<char *>(readBytes.data()), // NOLINT(*-pro-type-reinterpret-cast)
                std::min(static_cast<std::streamsize>(lineLength), remaining));
     nRead = input.gcount();
 
-    if (!input) return result::read_error;
+    if (!input) {
+      return result::read_error;
+    }
 
     output << "  .byte ";
 
-    for (std::streamsize n = 0; n < nRead; ++n) {
-      output << std::setw(3) << static_cast<uint16_t>(readBytes[n]);
-      if (n < nRead - 1) output << ',';
+    for (std::streamsize index = 0; index < nRead; ++index) {
+      output << std::setw(3) << static_cast<uint16_t>(readBytes[index]);
+      if (index < nRead - 1) {
+        output << ',';
+      }
     }
 
-    output << std::endl;
+    output << '\n';
   }
 
-  output << std::endl
-         << c_identifier << "_end:" << std::endl
-         << std::endl
-         << "  .align" << std::endl
-         << c_identifier << "_size: .int " << size << std::endl;
+  output << '\n'
+         << c_identifier << "_end:\n"
+         << '\n'
+         << "  .align\n"
+         << c_identifier << "_size: .int " << size << '\n';
 
   return result::success;
 }
 
-int bin2s_files(const std::vector<std::string> &files, std::ostream &output,
-                int32_t alignment = 4, int32_t lineLength = 16) {
-  output << "/* Generated by BIN2S - please don't edit directly */"
-         << std::endl;
+auto bin2s_files(const std::vector<std::string> &files, std::ostream &output,
+                 const int32_t alignment = DEFAULT_ALIGNMENT,
+                 const int32_t lineLength = DEFAULT_BYTES_PER_LINE) -> int {
+  output << "/* Generated by BIN2S - please don't edit directly */\n";
 
   for (const auto &file : files) {
     std::ifstream input(file, std::ios::binary);
 
     if (!input) {
-      std::cerr << "bin2s: error: could not open  \"" << file << '"'
-                << std::endl;
+      std::cerr << "bin2s: error: could not open  \"" << file << "\"\n";
       return 1;
     }
 
-    auto ret = bin2s(basename(file), input, output, alignment, lineLength);
+    const auto ret =
+        bin2s(basename(file), input, output, alignment, lineLength);
     input.close();
 
     switch (ret) {
@@ -155,15 +179,13 @@ int bin2s_files(const std::vector<std::string> &files, std::ostream &output,
     case result::identifier_invalid:
       std::cerr
           << "bin2s: error: filename does not contain any valid characters \""
-          << file << '"' << std::endl;
+          << file << "\"\n";
       return 1;
     case result::read_error:
-      std::cerr << "bin2s: error: unable to read file \"" << file << '"'
-                << std::endl;
+      std::cerr << "bin2s: error: unable to read file \"" << file << "\"\n";
       return 1;
     case result::empty_stream:
-      std::cerr << "bin2s: warning: skipping empty file \"" << file << '"'
-                << std::endl;
+      std::cerr << "bin2s: warning: skipping empty file \"" << file << "\"\n";
       break;
     }
   }
@@ -171,7 +193,7 @@ int bin2s_files(const std::vector<std::string> &files, std::ostream &output,
   return 0;
 }
 
-int main(int argc, char *argv[]) {
+auto main(int argc, char *argv[]) -> int {
   args::ArgumentParser parser("Convert binary files to GCC assembly modules.");
   static constexpr auto extended_description = R"__(
 For each input file it will output assembly defining:
@@ -204,11 +226,11 @@ e.g. for gfx/foo.bin {identifier} will be foo_bin,
                           {'h', "help"});
   args::ValueFlag<int32_t, PO2IntReader> alignmentFlag(
       parser, "ALIGNMENT", "Boundary alignment, in bytes [default: 4]",
-      {'a', "alignment"}, 4);
+      {'a', "alignment"}, DEFAULT_ALIGNMENT);
   args::ValueFlag<int32_t, PositiveIntReader> lineLengthFlag(
       parser, "LINE_LENGTH",
       "Number of bytes to output per line of ASM [default: 16]",
-      {'l', "line-length"}, 16);
+      {'l', "line-length"}, DEFAULT_BYTES_PER_LINE);
   args::ValueFlag<std::string> outputFlag(
       parser, "OUTPUT", "Output file, \"-\" represents stdout [default: -]",
       {'o', "output"}, "-");
@@ -217,14 +239,12 @@ e.g. for gfx/foo.bin {identifier} will be foo_bin,
 
   try {
     parser.ParseCLI(argc, argv);
-  } catch (args::Help) {
-    std::cout << parser;
-    std::cout << extended_description;
+  } catch (args::Help &) {
+    std::cout << parser << extended_description;
     return 0;
-  } catch (args::ParseError e) {
-    std::cerr << e.what() << std::endl;
-    std::cerr << parser;
-    std::cerr << extended_description;
+  } catch (args::ParseError &e) {
+    std::cerr << "ERROR: " << e.what() << "\n\n"
+              << parser << extended_description;
     return 1;
   }
 
@@ -233,19 +253,21 @@ e.g. for gfx/foo.bin {identifier} will be foo_bin,
   const auto &outputFile = args::get(outputFlag);
   const auto &inputFiles = args::get(filesList);
 
-  if (inputFiles.empty()) return 0;
+  if (inputFiles.empty()) {
+    return 0;
+  }
 
   if (outputFile == "-") {
     return bin2s_files(inputFiles, std::cout, alignment, lineLength);
-  } else {
-    std::ofstream output(outputFile);
-    if (!output) {
-      std::cerr << "bin2s: error: could not open output file \"" << outputFile
-                << '"' << std::endl;
-      return 1;
-    }
-    auto ret = bin2s_files(inputFiles, output, alignment, lineLength);
-    output.close();
-    return ret;
   }
+
+  std::ofstream output(outputFile);
+  if (!output) {
+    std::cerr << "bin2s: error: could not open output file \"" << outputFile
+              << '"' << '\n';
+    return 1;
+  }
+  auto ret = bin2s_files(inputFiles, output, alignment, lineLength);
+  output.close();
+  return ret;
 }

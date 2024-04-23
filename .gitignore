@@ -11,3 +11,6 @@ build/
 build-debug/
 build-release/
 build-relwithdebinfo/
+cmake-build-*/
+
+.idea/

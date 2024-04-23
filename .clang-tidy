@@ -1,0 +1,5 @@
+---
+Checks:           'clang-diagnostic-*,clang-analyzer-*,cert-*,cppcoreguidelines-*,modernize-*,performance-*,readability-*'
+WarningsAsErrors: ''
+FormatStyle:      file
+

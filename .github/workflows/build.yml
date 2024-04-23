@@ -1,0 +1,42 @@
+name: Build
+
+on: [pull_request, push]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu
+            cc: gcc
+            cxx: g++
+
+          - os: ubuntu
+            cc: clang
+            cxx: clang++
+
+          - os: macos
+
+          - os: windows
+
+    runs-on: ${{matrix.os}}-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Configure CC & CXX
+        if: matrix.cc != '' && matrix.cxx != ''
+        run: echo "CC=${{matrix.cc}}" >> $GITHUB_ENV && echo "CXX=${{matrix.cxx}}" >> $GITHUB_ENV
+
+      - name: Configure CMake
+        run: cmake -B ${{github.workspace}}/build -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_COMPILE_WARNING_AS_ERROR=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Build
+        run: cmake --build ${{github.workspace}}/build --config Release
+
+      - name: Run clang-tidy
+        if: matrix.os == 'ubuntu' && matrix.cc == 'clang'
+        run: clang-tidy --warnings-as-errors="*" -p ${{github.workspace}}/build src/bin2s.cpp

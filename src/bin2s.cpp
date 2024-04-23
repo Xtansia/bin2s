@@ -13,6 +13,7 @@
 #include <iostream>
 #include <regex>
 #include <string>
+#include <string_view>
 
 constexpr int32_t DEFAULT_ALIGNMENT = 4;
 constexpr int32_t DEFAULT_BYTES_PER_LINE = 16;

@@ -1,7 +1,7 @@
 # bin2s
 Convert binary files to GCC assembly modules.
 
-A C++11 port of devkitPro's [bin2s](https://github.com/devkitPro/general-tools/blob/master/bin2s.c).
+A C++17 port of devkitPro's [bin2s](https://github.com/devkitPro/general-tools/blob/master/bin2s.c).
 
 ```
 bin2s {OPTIONS} [FILES...]
